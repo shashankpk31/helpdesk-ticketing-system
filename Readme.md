@@ -1,247 +1,65 @@
-# Helpdesk Ticketing System Setup 🚀
+# Helpdesk Ticketing System - Development Summary
 
-## **Project Initialization**
-1. Created a new project folder and initialized `npm`:
-    ```bash
-    mkdir helpdesk-ticketing-system
-    cd helpdesk-ticketing-system
-    npm init -y
-    ```
+## **📌 What We Did Today**
+We successfully set up the **Helpdesk Ticketing System** using **Node.js, EJS as a template engine, Passport.js for authentication, and PostgreSQL for database management.** Key tasks accomplished:
 
-2. Installed necessary dependencies:
-    ```bash
-    npm install express ejs dotenv passport passport-local express-session pg sequelize bcryptjs
-    ```
+1. **Project Initialization**  
+   - Created a Node.js project and installed essential dependencies.
+   - Set up the project structure for scalability and maintainability.
 
-3. Set up folder structure:
-    ```
-    helpdesk-ticketing-system/
-    │── views/ (EJS templates)
-    │── public/ (Static assets: CSS, JS, Images)
-    │── models/ (Database models)
-    │── routes/ (Express routes)
-    │── controllers/ (Handling request logic)
-    │── config/ (Database configuration)
-    │── .env (Environment variables)
-    │── server.js (Main application file)
-    ```
+2. **Database Connection Setup**  
+   - Configured PostgreSQL using Sequelize ORM.
+   - Ensured automatic table creation via model definitions.
 
----
+3. **User Authentication with Passport.js**  
+   - Implemented **registration, login, and session management**.
+   - Used **bcrypt** for password hashing.
+   - Established Express-session for session persistence.
 
-## **Express & EJS Setup**
-1. Configured Express inside `server.js`:
-    ```js
-    require('dotenv').config();
-    const express = require('express');
-    const session = require('express-session');
-    const passport = require('passport');
+4. **Landing Page & Basic UI**  
+   - Created a **visually appealing home page** with EJS templates.
+   - Added static assets (CSS for styling).
 
-    const app = express();
-
-    app.set('view engine', 'ejs');
-    app.use(express.static('public'));
-    app.use(express.urlencoded({ extended: true }));
-
-    app.use(session({ secret: 'secretkey', resave: false, saveUninitialized: true }));
-    app.use(passport.initialize());
-    app.use(passport.session());
-
-    app.get('/', (req, res) => {
-        res.render('index', { title: 'Helpdesk Ticketing System' });
-    });
-
-    app.listen(process.env.PORT || 5000, () => console.log('Server running'));
-    ```
+5. **Debugging & Fixes**  
+   - Resolved **database connection errors**.
+   - Fixed **redirect issues** in form submissions.
+   - Ensured correct initialization of Passport authentication strategies.
 
 ---
 
-## **Database Connection (PostgreSQL)**
-1. Configured PostgreSQL connection in `config/db.js`:
-    ```js
-    require('dotenv').config();
-    const { Sequelize } = require('sequelize');
+## **⚠️ Challenges Faced & Solutions**
+1. **Database Table Not Found Error**  
+   - **Issue:** PostgreSQL threw an error saying **“relation ‘Users’ does not exist”**.  
+   - **Solution:** Used Sequelize’s `sequelize.sync()` to ensure automatic table creation.
 
-    const databaseUrl = process.env.DATABASE_URL;
+2. **Passport.js Authentication Error**  
+   - **Issue:** **Unknown authentication strategy 'local'** error.  
+   - **Solution:** Made sure **Passport was correctly initialized** in the main `server.js` file.
 
-    if (!databaseUrl) {
-        throw new Error('DATABASE_URL is missing in environment variables');
-    }
-
-    const sequelize = new Sequelize(databaseUrl, {
-        dialect: 'postgres',
-        logging: false
-    });
-
-    sequelize.authenticate()
-        .then(() => console.log('PostgreSQL connected'))
-        .catch(err => console.error('Database connection error:', err));
-
-    module.exports = sequelize;
-    ```
-
-2. Added `.env` file:
-    ```
-    PORT=5000
-    DATABASE_URL=postgres://username:password@localhost:5432/helpdeskdb
-    SESSION_SECRET=your_secret_key
-    ```
+3. **Registration Page Refresh Issue**  
+   - **Issue:** Form **refreshed but didn’t redirect after submission**.  
+   - **Solution:** Ensured Express parsed incoming request data properly and correctly handled errors.
 
 ---
 
-## **User Model & Authentication**
-1. Defined `User` model inside `models/user.js`:
-    ```js
-    const { Sequelize, DataTypes } = require('sequelize');
-    const sequelize = require('../config/db');
-    const bcrypt = require('bcryptjs');
+## **🔑 How Authentication Works**
+1. **Registration Process**  
+   - User submits their **username and password**.
+   - Password is **hashed** before storing in PostgreSQL.
+   - User is **redirected to the login page** upon successful registration.
 
-    const User = sequelize.define('User', {
-        username: { type: DataTypes.STRING, allowNull: false, unique: true },
-        password: { type: DataTypes.STRING, allowNull: false }
-    });
+2. **Login Process**  
+   - User enters their credentials.
+   - Passport **checks the database for the username**.
+   - The submitted password is **compared** with the stored hash.
+   - If credentials are valid, a **session is created**.
 
-    User.beforeCreate(async (user) => {
-        user.password = await bcrypt.hash(user.password, 10);
-    });
+3. **Session Management**  
+   - Using **Express-session**, users remain logged in across requests.
+   - The session holds user details, allowing personalized interactions.
 
-    sequelize.sync()
-        .then(() => console.log('User table created or already exists'))
-        .catch(err => console.error('Error syncing database:', err));
+4. **Logout Mechanism**  
+   - Logging out destroys the session and redirects the user back to the home page.
 
-    module.exports = User;
-    ```
 
----
 
-## **Passport.js Authentication**
-1. Set up Passport.js inside `config/passport.js`:
-    ```js
-    const passport = require('passport');
-    const LocalStrategy = require('passport-local').Strategy;
-    const bcrypt = require('bcryptjs');
-    const { User } = require('../models/user');
-
-    passport.use(new LocalStrategy(async (username, password, done) => {
-        try {
-            const user = await User.findOne({ where: { username } });
-            if (!user) return done(null, false, { message: 'User not found' });
-
-            const isValid = await bcrypt.compare(password, user.password);
-            if (!isValid) return done(null, false, { message: 'Incorrect password' });
-
-            return done(null, user);
-        } catch (error) {
-            return done(error);
-        }
-    }));
-
-    passport.serializeUser((user, done) => done(null, user.id));
-    passport.deserializeUser(async (id, done) => {
-        try {
-            const user = await User.findByPk(id);
-            done(null, user);
-        } catch (error) {
-            done(error);
-        }
-    });
-
-    module.exports = passport;
-    ```
-
----
-
-## **Auth Routes (Register & Login)**
-1. Created `routes/auth.js`:
-    ```js
-    const express = require('express');
-    const passport = require('passport');
-    const { User } = require('../models/user');
-
-    const router = express.Router();
-
-    router.get('/login', (req, res) => res.render('login', { title: 'Login' }));
-
-    router.post('/login', passport.authenticate('local', {
-        successRedirect: '/',
-        failureRedirect: '/login',
-        failureFlash: true
-    }));
-
-    router.get('/register', (req, res) => res.render('register', { title: 'Register' }));
-
-    router.post('/register', async (req, res) => {
-        try {
-            await User.create({ username: req.body.username, password: req.body.password });
-            res.redirect('/login');
-        } catch (error) {
-            console.error("Registration error:", error);
-            res.redirect('/register');
-        }
-    });
-
-    router.get('/logout', (req, res) => {
-        req.logout(() => res.redirect('/'));
-    });
-
-    module.exports = router;
-    ```
-
-2. Integrated Auth Routes in `server.js`:
-    ```js
-    const authRoutes = require('./routes/auth');
-    app.use(authRoutes);
-    ```
-
----
-
-## **Views (Login & Register Pages)**
-1. `views/login.ejs`:
-    ```html
-    <h1>Login</h1>
-    <form method="POST" action="/login">
-        <label>Username:</label>
-        <input type="text" name="username" required>
-        <label>Password:</label>
-        <input type="password" name="password" required>
-        <button type="submit">Login</button>
-    </form>
-    ```
-
-2. `views/register.ejs`:
-    ```html
-    <h1>Register</h1>
-    <form method="POST" action="/register">
-        <label>Username:</label>
-        <input type="text" name="username" required>
-        <label>Password:</label>
-        <input type="password" name="password" required>
-        <button type="submit">Register</button>
-    </form>
-    ```
-
----
-
-## **Debugging Setup**
-1. Created `launch.json` for VS Code debugging:
-    ```json
-    {
-        "version": "0.2.0",
-        "configurations": [
-            {
-                "name": "Debug Node.js",
-                "type": "node",
-                "request": "launch",
-                "program": "${workspaceFolder}/server.js",
-                "envFile": "${workspaceFolder}/.env",
-                "console": "integratedTerminal"
-            }
-        ]
-    }
-    ```
-
----
-
-### **Next Steps**
-✔️ Setting up **dashboard & ticketing functionality**  
-✔️ Implementing **authorization (user roles & access control)**  
-✔️ Deploying the project on **Render.com**
